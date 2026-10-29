@@ -1,0 +1,113 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+  ALLURE_VERSION: "3.22.1" # keep equal to the version in README.md
+
+jobs:
+  quality:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: python -m pip install -r requirements.txt
+      - run: python -m black --check lib test_e2e tools conftest.py
+      - run: python -m isort --check lib test_e2e tools conftest.py
+      - run: python -m flake8 lib test_e2e tools conftest.py
+      - run: python -m mypy lib test_e2e tools conftest.py
+      - run: python tools/aaa_structure_linter.py
+
+  e2e:
+    name: E2E tests (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # run every browser, even if one fails
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: python -m pip install -r requirements.txt
+      - run: python -m playwright install --with-deps ${{ matrix.browser }}
+      - run: python -m pytest --browser ${{ matrix.browser }}
+      - name: Keep Allure results for the report job
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: allure-results-${{ matrix.browser }}
+          path: allure-results/
+          retention-days: 7
+      - name: Keep screenshots and traces of failed tests
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.browser }}
+          path: test-results/
+          retention-days: 7
+
+  report:
+    name: Allure report
+    needs: e2e
+    if: ${{ !cancelled() }} # build the report also when tests fail: that is when it is most useful
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7 # for allurerc.json
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: allure-results-*
+          path: allure-results
+          merge-multiple: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npx -y allure@${{ env.ALLURE_VERSION }} generate ./allure-results
+      - name: Keep the report as a downloadable file
+        uses: actions/upload-artifact@v7
+        with:
+          name: allure-report
+          path: allure-report/index.html
+          retention-days: 30
+      - name: Prepare the report for GitHub Pages
+        if: ${{ vars.PAGES_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: allure-report/
+
+  publish:
+    name: Publish report to GitHub Pages
+    needs: report
+    # Opt-in: set Settings -> Pages -> Source "GitHub Actions", then add the repository variable PAGES_ENABLED=true.
+    if: ${{ vars.PAGES_ENABLED == 'true' && !cancelled() && needs.report.result == 'success' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5
