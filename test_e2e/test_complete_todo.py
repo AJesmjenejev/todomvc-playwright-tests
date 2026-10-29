@@ -10,7 +10,7 @@ class TestCompleteTodo:
     @allure.severity(allure.severity_level.CRITICAL)
     def test_complete_todo_appears_in_completed_view(self, todo_app: TodoKeywords) -> None:
         """Requirement: a todo item can be marked as completed and appears correctly in the "Completed" view
-        (URL #/completed, only that todo listed, checkbox checked)."""
+        (URL #/completed, only that todo listed, checkbox checked and shown crossed out)."""
         # Given
         todo_app.add_todos(["Buy milk", "Walk dog"])
 

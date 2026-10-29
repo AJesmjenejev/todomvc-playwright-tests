@@ -4,3 +4,8 @@ import re
 def exact_text(text: str) -> re.Pattern[str]:
     # A plain string would let Playwright trim and collapse spaces before comparing.
     return re.compile(rf"^{re.escape(text)}$")
+
+
+def which(title: str, nth: int | None) -> str:
+    # For log lines: 'Buy milk', or 'Buy milk' (#2) when one of several todos with that title is meant.
+    return f"'{title}'" if nth is None else f"'{title}' (#{nth + 1})"

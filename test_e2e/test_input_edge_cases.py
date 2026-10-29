@@ -38,3 +38,30 @@ class TestInputEdgeCases:
         # Then
         todo_app.expect_todos([long_title])
         todo_app.expect_todo_title_fits_in_list(long_title)
+
+    @allure.title("Duplicate titles: completing one completes only that one")
+    def test_input_duplicate_title_complete_one(self, todo_app: TodoKeywords) -> None:
+        """Two todos may have the same title. The second one is chosen by position (nth=1),
+        so the counter proves the first one is still active."""
+        # Given
+        todo_app.add_todos(["Buy milk", "Buy milk", "Walk dog"])
+
+        # When
+        todo_app.complete_todo("Buy milk", nth=1)
+
+        # Then
+        todo_app.expect_todos(["Buy milk", "Buy milk", "Walk dog"])
+        todo_app.expect_todo_completed("Buy milk", nth=1)
+        todo_app.expect_items_left(2)
+
+    @allure.title("Duplicate titles: deleting one keeps the other")
+    def test_input_duplicate_title_delete_one(self, todo_app: TodoKeywords) -> None:
+        # Given
+        todo_app.add_todos(["Buy milk", "Buy milk", "Walk dog"])
+
+        # When
+        todo_app.delete_todo("Buy milk", nth=0)
+
+        # Then
+        todo_app.expect_todos(["Buy milk", "Walk dog"])
+        todo_app.expect_items_left(2)

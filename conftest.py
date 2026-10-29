@@ -1,11 +1,11 @@
 import logging
 import time
 from pathlib import Path
-from typing import Any, Generator
+from typing import Callable, Generator
 
 import allure
 import pytest
-from playwright.sync_api import Browser, Page
+from playwright.sync_api import BrowserContext, Page
 
 from lib.keywords.todo_keywords import TodoKeywords
 from lib.pom.page_todo import TodoPage
@@ -31,6 +31,11 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
     if report.when == "call" or (report.when == "setup" and not report.passed):
         seconds = time.monotonic() - _test_started_at.pop(report.nodeid, time.monotonic())
         log.info(f"{'-' * 20} {report.outcome.upper()} in {seconds:.1f} s\n")
+    # The test body can pass while cleanup after it fails: say so, or the log would only show PASSED.
+    if report.when == "teardown" and report.failed:
+        crash = getattr(report.longrepr, "reprcrash", None)  # pytest's short "Error: message" summary
+        reason = crash.message if crash else report.longreprtext.strip().splitlines()[-1]
+        log.error(f"{'-' * 20} TEARDOWN FAILED: {reason}\n")
 
 
 @pytest.fixture(autouse=True)
@@ -68,10 +73,8 @@ def todo_app(page: Page) -> TodoKeywords:
 
 
 @pytest.fixture
-def fresh_todo_app(browser: Browser, browser_context_args: dict[str, Any]) -> Generator[TodoKeywords, None, None]:
+def fresh_todo_app(new_context: Callable[..., BrowserContext]) -> TodoKeywords:
     # A second, separate browser context: like another user or a new browser profile. Not opened yet.
-    context = browser.new_context(**browser_context_args)
-    try:
-        yield TodoKeywords(TodoPage(context.new_page()))
-    finally:
-        context.close()
+    # pytest-playwright's new_context gives it the same base_url, records its screenshot and trace on
+    # failure, and closes it after the test.
+    return TodoKeywords(TodoPage(new_context().new_page()))

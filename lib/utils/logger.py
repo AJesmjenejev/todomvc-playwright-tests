@@ -12,5 +12,9 @@ class TestLogger:
         _logger.info(message, stacklevel=2)
 
     @staticmethod
+    def error(message: str) -> None:
+        _logger.error(message, stacklevel=2)
+
+    @staticmethod
     def debug(message: str) -> None:
         _logger.debug(f"   {message}", stacklevel=2)  # indented: a detail of the INFO step above
