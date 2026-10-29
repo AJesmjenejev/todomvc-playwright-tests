@@ -1,0 +1,13 @@
+{
+  "name": "TodoMVC Playwright tests",
+  "output": "./allure-report",
+  "plugins": {
+    "awesome": {
+      "options": {
+        "singleFile": true,
+        "reportLanguage": "en",
+        "groupBy": ["parentSuite", "feature"]
+      }
+    }
+  }
+}
