@@ -1,0 +1,35 @@
+# Keep the revs equal to the versions in requirements.txt.
+# Settings come from pyproject.toml (black, isort, mypy) and .flake8.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-ast
+      - id: check-toml
+      - id: check-yaml
+  - repo: https://github.com/psf/black
+    rev: 26.10.1
+    hooks:
+      - id: black
+  - repo: https://github.com/PyCQA/isort
+    rev: 9.0.2
+    hooks:
+      - id: isort
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.5.0
+    hooks:
+      - id: flake8
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.4.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [pytest==9.2.0, playwright==1.64.1, allure-pytest==2.16.2]
+  - repo: local
+    hooks:
+      - id: aaa-structure
+        name: AAA structure (# Given / # When / # Then)
+        entry: python tools/aaa_structure_linter.py
+        language: system
+        pass_filenames: false
