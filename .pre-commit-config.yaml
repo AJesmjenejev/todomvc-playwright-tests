@@ -1,5 +1,5 @@
 # Keep the revs equal to the versions in requirements.txt.
-# Settings come from pyproject.toml (black, isort, mypy) and .flake8.
+# Settings come from pyproject.toml (ruff, mypy).
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -9,18 +9,11 @@ repos:
       - id: check-ast
       - id: check-toml
       - id: check-yaml
-  - repo: https://github.com/psf/black
-    rev: 26.10.1
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3
     hooks:
-      - id: black
-  - repo: https://github.com/PyCQA/isort
-    rev: 9.0.2
-    hooks:
-      - id: isort
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.5.0
-    hooks:
-      - id: flake8
+      - id: ruff-check
+      - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.4.0
     hooks:
@@ -31,5 +24,5 @@ repos:
       - id: aaa-structure
         name: AAA structure (# Given / # When / # Then)
         entry: python tools/aaa_structure_linter.py
-        language: system
+        language: python # pre-commit's own environment: no dependence on the `python` found on PATH
         pass_filenames: false

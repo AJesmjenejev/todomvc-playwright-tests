@@ -34,3 +34,32 @@ class TestDeleteTodo:
 
         # Then
         todo_app.expect_todos(remaining)
+
+    @allure.title("Deleting the last todo hides the list and the footer")
+    def test_delete_todo_last_todo_hides_list_and_footer(self, todo_app: TodoKeywords) -> None:
+        """The counter is checked before the delete: the footer was visible, so its absence means something."""
+        # Given
+        todo_app.add_todo("Buy milk")
+        todo_app.expect_items_left(1)
+
+        # When
+        todo_app.delete_todo("Buy milk")
+
+        # Then
+        todo_app.expect_list_and_footer_hidden()
+
+    @allure.title("Deleting todos lowers the items-left counter only for active todos")
+    def test_delete_todo_counter_counts_only_active_todos(self, todo_app: TodoKeywords) -> None:
+        """Deleting a completed todo must not change the counter, deleting an active one must lower it.
+        One of each is deleted, so a wrong rule in either direction gives 0 or 2 instead of 1."""
+        # Given
+        todo_app.add_todos(["Buy milk", "Walk dog", "Pay rent"])
+        todo_app.complete_todo("Pay rent")
+
+        # When
+        todo_app.delete_todo("Pay rent")
+        todo_app.delete_todo("Buy milk")
+
+        # Then
+        todo_app.expect_todos(["Walk dog"])
+        todo_app.expect_items_left(1)

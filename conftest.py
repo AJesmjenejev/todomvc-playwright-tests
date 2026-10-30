@@ -1,46 +1,42 @@
-import logging
-import time
+import os
+from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Callable, Generator
 
 import allure
 import pytest
-from playwright.sync_api import BrowserContext, Page
+from playwright.sync_api import BrowserContext, Page, expect
 
 from lib.keywords.todo_keywords import TodoKeywords
 from lib.pom.page_todo import TodoPage
-from lib.utils.logger import TestLogger as log
+from lib.utils.constants.timeouts import CHECK_TIMEOUT_MS, NAVIGATION_TIMEOUT_MS
+
+pytest_plugins = ["lib.utils.log_results"]
 
 ARTIFACT_FOLDER = pytest.StashKey[Path]()
 
 
-def pytest_configure() -> None:
-    logging.getLogger("asyncio").setLevel(logging.WARNING)  # hide "Using proactor: ..." noise
+@pytest.hookimpl(tryfirst=True)  # before pytest's logging plugin opens the log file
+def pytest_configure(config: pytest.Config) -> None:
+    expect.set_options(timeout=CHECK_TIMEOUT_MS)
+    worker = os.environ.get("PYTEST_XDIST_WORKER")  # set by pytest-xdist in each worker: gw0, gw1, ...
+    if worker:  # one log file per worker, or the workers would mix their lines in one file
+        config.option.log_file = f"logs/tests-{worker}.log"
 
 
-_test_started_at: dict[str, float] = {}
+def apply_timeouts(context: BrowserContext) -> None:
+    # expect.set_options covers only expect(...). Without this, click, fill and check wait the 30 s default.
+    context.set_default_timeout(CHECK_TIMEOUT_MS)
+    context.set_default_navigation_timeout(NAVIGATION_TIMEOUT_MS)
 
 
-def pytest_runtest_logstart(nodeid: str) -> None:
-    _test_started_at[nodeid] = time.monotonic()
-    log.info(f"{'=' * 20} {nodeid}")
-
-
-def pytest_runtest_logreport(report: pytest.TestReport) -> None:
-    # One result line per test: after the test body, or after setup if the test never started.
-    if report.when == "call" or (report.when == "setup" and not report.passed):
-        seconds = time.monotonic() - _test_started_at.pop(report.nodeid, time.monotonic())
-        log.info(f"{'-' * 20} {report.outcome.upper()} in {seconds:.1f} s\n")
-    # The test body can pass while cleanup after it fails: say so, or the log would only show PASSED.
-    if report.when == "teardown" and report.failed:
-        crash = getattr(report.longrepr, "reprcrash", None)  # pytest's short "Error: message" summary
-        reason = crash.message if crash else report.longreprtext.strip().splitlines()[-1]
-        log.error(f"{'-' * 20} TEARDOWN FAILED: {reason}\n")
+@pytest.fixture(autouse=True)
+def set_context_timeouts(context: BrowserContext) -> None:
+    apply_timeouts(context)
 
 
 @pytest.fixture(autouse=True)
 def group_report_by_browser(browser_name: str) -> None:
-    # Without this, the runs of one test in different browsers look identical in the Allure tree.
+    # Otherwise the runs of one test in different browsers look identical in the Allure tree.
     allure.dynamic.parent_suite(browser_name)
     allure.dynamic.tag(browser_name)
 
@@ -52,8 +48,7 @@ def remember_artifact_folder(request: pytest.FixtureRequest, output_path: str) -
 
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_teardown(item: pytest.Item) -> Generator[None, None, None]:
-    # pytest-playwright saves the screenshot and trace of a failed test when the browser closes,
-    # so they only exist after teardown. Attach them to the Allure report then.
+    # pytest-playwright saves the screenshot and trace only when the browser closes, so attach them after teardown.
     try:
         yield
     finally:
@@ -74,7 +69,7 @@ def todo_app(page: Page) -> TodoKeywords:
 
 @pytest.fixture
 def fresh_todo_app(new_context: Callable[..., BrowserContext]) -> TodoKeywords:
-    # A second, separate browser context: like another user or a new browser profile. Not opened yet.
-    # pytest-playwright's new_context gives it the same base_url, records its screenshot and trace on
-    # failure, and closes it after the test.
-    return TodoKeywords(TodoPage(new_context().new_page()))
+    # A second, separate session; pytest-playwright's new_context records and closes it like the first.
+    context = new_context()
+    apply_timeouts(context)
+    return TodoKeywords(TodoPage(context.new_page()))

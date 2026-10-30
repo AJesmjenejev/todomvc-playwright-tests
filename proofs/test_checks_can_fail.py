@@ -27,6 +27,31 @@ class TestChecksCanFail:
         with pytest.raises(AssertionError):
             todo_app.expect_todos(["Walk dog"])
 
+    def test_delete_that_leaves_the_footer_is_caught(
+        self, todo_app: TodoKeywords, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Given
+        todo_app.add_todo("Buy milk")
+        monkeypatch.setattr(TodoPage, "delete_todo", lambda self, title, nth=None: None)
+
+        # When
+        todo_app.delete_todo("Buy milk")
+
+        # Then
+        with pytest.raises(AssertionError):
+            todo_app.expect_list_and_footer_hidden()
+
+    def test_input_that_is_not_cleared_is_caught(self, todo_app: TodoKeywords, page: Page) -> None:
+        # Given
+        todo_app.add_todo("Buy milk")
+
+        # When
+        page.get_by_placeholder("What needs to be done?").fill("leftover")
+
+        # Then
+        with pytest.raises(AssertionError):
+            todo_app.expect_new_todo_input_empty()
+
     def test_untrimmed_title_is_caught(self, todo_app: TodoKeywords, page: Page) -> None:
         # Given
         todo_app.add_todo("padded")
@@ -64,7 +89,7 @@ class TestChecksCanFail:
         page.add_style_tag(content=css)
 
         # Then
-        with pytest.raises(AssertionError):
+        with pytest.raises(AssertionError, match=r"text x -?\d+\.\.\d+, item x -?\d+\.\.\d+"):  # shows the numbers
             todo_app.expect_todo_title_fits_in_list("x" * 300)
 
     def test_wrong_duplicate_completed_is_caught(self, todo_app: TodoKeywords, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -80,6 +105,23 @@ class TestChecksCanFail:
         # Then
         with pytest.raises(AssertionError):
             todo_app.expect_todo_completed("Buy milk", nth=1)
+
+    def test_wrong_duplicate_deleted_is_caught(self, todo_app: TodoKeywords, monkeypatch: pytest.MonkeyPatch) -> None:
+        def delete_second(self: TodoPage, title: str, nth: int | None = None) -> None:
+            self.todo_item(title, 1).hover()
+            self.delete_btn(title, 1).click()
+
+        # Given
+        todo_app.add_todos(["Buy milk", "Buy milk"])
+        todo_app.complete_todo("Buy milk", nth=1)
+        monkeypatch.setattr(TodoPage, "delete_todo", delete_second)
+
+        # When
+        todo_app.delete_todo("Buy milk", nth=0)
+
+        # Then
+        with pytest.raises(AssertionError):
+            todo_app.expect_todo_completed("Buy milk")
 
     def test_wrong_view_url_is_caught(self, todo_app: TodoKeywords, page: Page) -> None:
         # Given
@@ -99,7 +141,7 @@ class TestChecksCanFail:
         todo_app.complete_todo("Buy milk")
 
         # When
-        page.get_by_test_id("todo-item").evaluate("item => item.classList.remove('completed')")
+        page.add_style_tag(content="[data-testid=todo-title] { text-decoration: none !important; }")
 
         # Then
         with pytest.raises(AssertionError):
@@ -116,6 +158,17 @@ class TestChecksCanFail:
         # Then
         with pytest.raises(AssertionError):
             todo_app.expect_todos(["Buy milk", "Walk dog"])
+
+    def test_reload_that_does_nothing_is_caught(self, todo_app: TodoKeywords, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Given
+        todo_app.add_todo("Buy milk")
+
+        # When
+        monkeypatch.setattr(Page, "reload", lambda self, **kwargs: None)
+
+        # Then
+        with pytest.raises(AssertionError, match="did not reload"):
+            todo_app.reload_app()
 
     def test_shared_storage_between_sessions_is_caught(self, todo_app: TodoKeywords, page: Page) -> None:
         # Given

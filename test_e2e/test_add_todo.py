@@ -63,6 +63,16 @@ class TestAddTodo:
         # Then
         todo_app.expect_items_left(2)
 
+    @allure.title("The input is cleared after a todo is added")
+    def test_add_todo_input_is_cleared(self, todo_app: TodoKeywords) -> None:
+        """The todo is listed first, so an empty input shows that the title was accepted, not lost."""
+        # When
+        todo_app.add_todo("Buy milk")
+
+        # Then
+        todo_app.expect_todos(["Buy milk"])
+        todo_app.expect_new_todo_input_empty()
+
     @allure.title("A blank title is ignored: {blank!r}")
     @pytest.mark.parametrize("blank", ["", "   "], ids=["empty", "spaces-only"])
     def test_add_todo_blank_title_is_ignored(self, todo_app: TodoKeywords, blank: str) -> None:

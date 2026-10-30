@@ -3,9 +3,8 @@ import logging
 _logger = logging.getLogger("todomvc")
 
 
-class TestLogger:
-    __test__ = False  # not a test class, even though the name starts with "Test"
-
+class Log:
+    # Not named Test*: pytest would take a class with that name for a test class.
     # stacklevel=2: the log shows the caller's file and line, not this file.
     @staticmethod
     def info(message: str) -> None:

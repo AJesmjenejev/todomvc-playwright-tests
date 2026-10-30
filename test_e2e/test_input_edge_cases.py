@@ -6,7 +6,7 @@ from lib.keywords.todo_keywords import TodoKeywords
 
 @allure.feature("Input edge cases")
 class TestInputEdgeCases:
-    @allure.title("HTML in a title is shown as text, not rendered: {title}")
+    @allure.title("HTML in a title is shown as plain text: {title}")
     @pytest.mark.parametrize(
         "title",
         [
@@ -16,8 +16,8 @@ class TestInputEdgeCases:
         ],
     )
     def test_input_html_is_shown_as_text(self, todo_app: TodoKeywords, title: str) -> None:
-        """User input must never become HTML. If it did, a title could run a script (XSS).
-        The title must be shown exactly as typed, and no element may be created inside it."""
+        """If user input became HTML, a title could run a script (XSS).
+        The title must appear exactly as typed, with no HTML element inside it."""
         # When
         todo_app.add_todo(title)
 
@@ -27,7 +27,7 @@ class TestInputEdgeCases:
 
     @allure.title("A very long title is kept in full and wraps inside the list")
     def test_input_long_title_wraps_inside_the_list(self, todo_app: TodoKeywords) -> None:
-        """A 300-character word without spaces is the hardest case for wrapping.
+        """A 300-character word has no spaces, so the browser has no place to break the line.
         The full text must be kept, and it must not stick out of the list."""
         # Given
         long_title = "x" * 300
@@ -56,12 +56,16 @@ class TestInputEdgeCases:
 
     @allure.title("Duplicate titles: deleting one keeps the other")
     def test_input_duplicate_title_delete_one(self, todo_app: TodoKeywords) -> None:
+        """The two titles look the same, so the list alone cannot show which one was deleted.
+        Only the second one is completed: if it is the one that remains, the first one was deleted."""
         # Given
         todo_app.add_todos(["Buy milk", "Buy milk", "Walk dog"])
+        todo_app.complete_todo("Buy milk", nth=1)
 
         # When
         todo_app.delete_todo("Buy milk", nth=0)
 
         # Then
         todo_app.expect_todos(["Buy milk", "Walk dog"])
-        todo_app.expect_items_left(2)
+        todo_app.expect_todo_completed("Buy milk")
+        todo_app.expect_items_left(1)

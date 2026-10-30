@@ -49,16 +49,19 @@ class TestCompleteTodo:
 
     @allure.title("Un-completing a todo returns it to the Active view")
     def test_complete_todo_unchecked_todo_returns_to_active_view(self, todo_app: TodoKeywords) -> None:
+        """Two todos are completed and only one is un-completed, so the Active list differs from the All list.
+        Otherwise the check could pass on the All list, before the view has switched."""
         # Given
-        todo_app.add_todos(["Buy milk", "Walk dog"])
+        todo_app.add_todos(["Buy milk", "Walk dog", "Pay rent"])
         todo_app.complete_todo("Buy milk")
+        todo_app.complete_todo("Walk dog")
 
         # When
         todo_app.uncomplete_todo("Buy milk")
         todo_app.open_view(TodoView.ACTIVE)
 
         # Then
-        todo_app.expect_todos(["Buy milk", "Walk dog"])
+        todo_app.expect_todos(["Buy milk", "Pay rent"])
 
     @allure.title("Completing a todo decreases the items-left counter")
     def test_complete_todo_counter_decreases_by_one(self, todo_app: TodoKeywords) -> None:

@@ -5,8 +5,8 @@ Rules:
 - `# Given` is optional (only when there is setup).
 - The order must be Given -> When -> Then.
 
-Usage: python tools/aaa_structure_linter.py [tests_dir]   (default: test_e2e)
-Exit code 1 if any test breaks a rule.
+Usage: python tools/aaa_structure_linter.py [tests_dir ...]   (default: test_e2e and proofs, found from this file)
+Exit code 1 if any test breaks a rule, or if a folder has no test files (so a wrong path never passes silently).
 """
 
 import ast
@@ -17,6 +17,7 @@ from pathlib import Path
 SECTION_ORDER = ("Given", "When", "Then")
 REQUIRED_SECTIONS = ("When", "Then")
 SECTION_COMMENT = re.compile(r"^\s*#\s*(Given|When|Then)\b")
+DEFAULT_DIRS = [Path(__file__).resolve().parent.parent / name for name in ("test_e2e", "proofs")]
 
 
 def find_violations(test_file: Path) -> list[str]:
@@ -40,12 +41,18 @@ def find_violations(test_file: Path) -> list[str]:
     return violations
 
 
-def main(tests_dir: str = "test_e2e") -> int:
-    violations = [v for test_file in sorted(Path(tests_dir).rglob("test_*.py")) for v in find_violations(test_file)]
+def main(tests_dirs: list[Path]) -> int:
+    violations = []
+    for tests_dir in tests_dirs:
+        test_files = sorted(tests_dir.rglob("test_*.py"))
+        if not test_files:
+            violations.append(f"{tests_dir}: no test files found, nothing was checked")
+        for test_file in test_files:
+            violations.extend(find_violations(test_file))
     for violation in violations:
         print(violation)
     return 1 if violations else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(*sys.argv[1:2]))
+    sys.exit(main([Path(arg) for arg in sys.argv[1:]] or DEFAULT_DIRS))
